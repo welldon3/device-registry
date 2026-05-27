@@ -1,0 +1,16 @@
+# Build artifacts
+build/
+
+# Serverless Framework - generated state, contains account ID and tokens
+.serverless/
+
+# IDE
+.idea/
+
+# macOS
+.DS_Store
+.localized
+
+# Go
+*.test
+*.out

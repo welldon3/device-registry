@@ -1,0 +1,130 @@
+org: dauren
+app: device-controller
+service: device-registry
+
+frameworkVersion: "4"
+configValidationMode: error
+
+params:
+  default:
+    apiSecret: ${env:API_SECRET, 'dev-secret-change-me'}
+  prod:
+    apiSecret: ${ssm:/device-registry/prod/apiSecret}
+
+provider:
+  name: aws
+  runtime: provided.al2
+  architecture: arm64
+  stage: ${opt:stage, 'dev'}
+  region: us-east-1
+  environment:
+    TABLE_NAME: !Ref DevicesTable
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+        - dynamodb:GetItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:Scan
+      Resource: !GetAtt DevicesTable.Arn
+  httpApi:
+    authorizers:
+      bearerAuth:
+        type: request
+        functionName: authorizer
+        resultTtlInSeconds: 300
+        identitySource: $request.header.Authorization
+        enableSimpleResponses: true
+
+package:
+  individually: true
+
+functions:
+  authorizer:
+    handler: bootstrap
+    memorySize: 128
+    timeout: 5
+    package:
+      artifact: build/lambda/authorizer.zip
+    environment:
+      API_SECRET: ${param:apiSecret}
+
+  getDeviceByID:
+    handler: bootstrap
+    memorySize: 128
+    timeout: 10
+    package:
+      artifact: build/lambda/getDeviceByID.zip
+    events:
+      - httpApi:
+          path: /devices/{id}
+          method: get
+          authorizer:
+            name: bearerAuth
+
+  saveDevice:
+    handler: bootstrap
+    memorySize: 128
+    timeout: 10
+    package:
+      artifact: build/lambda/saveDevice.zip
+    events:
+      - httpApi:
+          path: /devices
+          method: post
+          authorizer:
+            name: bearerAuth
+
+  deleteDevice:
+    handler: bootstrap
+    memorySize: 128
+    timeout: 10
+    package:
+      artifact: build/lambda/deleteDevice.zip
+    events:
+      - httpApi:
+          path: /devices/{id}
+          method: delete
+          authorizer:
+            name: bearerAuth
+
+  getAllDevices:
+    handler: bootstrap
+    memorySize: 256
+    timeout: 29
+    package:
+      artifact: build/lambda/getAllDevices.zip
+    events:
+      - httpApi:
+          path: /devices
+          method: get
+          authorizer:
+            name: bearerAuth
+
+  updateDevice:
+    handler: bootstrap
+    memorySize: 128
+    timeout: 10
+    package:
+      artifact: build/lambda/updateDevice.zip
+    events:
+      - httpApi:
+          path: /devices/{id}
+          method: put
+          authorizer:
+            name: bearerAuth
+
+resources:
+  Resources:
+    DevicesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: Devices
+        AttributeDefinitions:
+          - AttributeName: deviceId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: deviceId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
