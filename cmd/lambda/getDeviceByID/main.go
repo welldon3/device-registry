@@ -8,9 +8,11 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	telemetry "github.com/welldon3/go-telemetry"
 )
 
 var svc lambdahelper.DeviceService
+var tel *telemetry.Provider
 
 func init() {
 	var err error
@@ -18,9 +20,20 @@ func init() {
 	if err != nil {
 		log.Fatalf("Unable to initialize repository: %v", err)
 	}
+
+	tel, err = telemetry.New(context.Background(), telemetry.Config{
+		ServiceName: "device-registry",
+		Exporter:    telemetry.ExporterStdout,
+	})
+	if err != nil {
+		log.Fatalf("Unable to initialize telemetry: %v", err)
+	}
 }
 
 func handle(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	ctx, span := tel.Tracer().Start(ctx, "getDeviceByID")
+	defer span.End()
+
 	requestID := lambdahelper.RequestID(ctx)
 
 	deviceID, ok := request.PathParameters["id"]

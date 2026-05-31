@@ -2,6 +2,8 @@
 
 REST API for managing devices. Go + AWS Lambda + DynamoDB, deployed via Serverless Framework.
 
+Traces via [go-telemetry](https://github.com/welldon3/go-telemetry).
+
 ## Stack
 
 - **Go 1.26**
